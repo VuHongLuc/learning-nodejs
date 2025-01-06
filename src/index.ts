@@ -1,107 +1,86 @@
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
-import { graphqlHTTP } from 'express-graphql';
-import { GraphQLObjectType, GraphQLSchema, GraphQLString, GraphQLInt, GraphQLList } from 'graphql';
 
 const prisma = new PrismaClient();
 const app = express();
 
 app.use(express.json());
 
-// 1. Định nghĩa các Type trong GraphQL
-const UserType = new GraphQLObjectType({
-    name: 'User',
-    fields: () => ({
-        id: { type: GraphQLString },
-        name: { type: GraphQLString },
-        age: { type: GraphQLInt },
-    }),
+// Tạo một user mới
+app.post('/user', async (req, res) => {
+    try {
+        const { name, age } = req.body;
+
+        const user = await prisma.user.create({
+            data: {
+                name: name,
+                age: age,
+            },
+        });
+
+        res.status(201).json(user);
+    } catch (error) {
+        res.status(500).json({ error: 'Something went wrong.' });
+    }
 });
 
-// 2. Định nghĩa các Query (Truy vấn)
-const RootQuery = new GraphQLObjectType({
-    name: 'RootQueryType',
-    fields: {
-        // Lấy danh sách tất cả người dùng
-        users: {
-            type: new GraphQLList(UserType),
-            resolve(parent, args) {
-                return prisma.user.findMany();
-            },
-        },
-        // Lấy một người dùng theo ID
-        user: {
-            type: UserType,
-            args: { id: { type: GraphQLString } },
-            resolve(parent, args) {
-                return prisma.user.findUnique({ where: { id: args.id } });
-            },
-        },
-    },
+// Lấy danh sách tất cả users
+app.get('/users', async (req, res) => {
+    try {
+        const users = await prisma.user.findMany();
+        res.json(users);
+    } catch (error) {
+        res.status(500).json({ error: 'Something went wrong.' });
+    }
 });
 
-// 3. Định nghĩa các Mutation (Thao tác thêm, sửa, xóa)
-const Mutation = new GraphQLObjectType({
-    name: 'Mutation',
-    fields: {
-        addUser: {
-            type: UserType,
-            args: {
-                name: { type: GraphQLString },
-                age: { type: GraphQLInt },
-            },
-            resolve(parent, args) {
-                return prisma.user.create({
-                    data: {
-                        name: args.name,
-                        age: args.age,
-                    },
-                });
-            },
-        },
-        updateUser: {
-            type: UserType,
-            args: {
-                id: { type: GraphQLString },
-                name: { type: GraphQLString },
-                age: { type: GraphQLInt },
-            },
-            resolve(parent, args) {
-                return prisma.user.update({
-                    where: { id: args.id },
-                    data: {
-                        name: args.name,
-                        age: args.age,
-                    },
-                });
-            },
-        },
-        deleteUser: {
-            type: UserType,
-            args: {
-                id: { type: GraphQLString },
-            },
-            resolve(parent, args) {
-                return prisma.user.delete({
-                    where: { id: args.id },
-                });
-            },
-        },
-    },
-});
+// Lay thong tin cua 1 user cu the
+app.get('/user/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const user = await prisma.user.findUnique({
+            where: {id: id},
+        });
 
-// 4. Cấu hình Schema GraphQL
-const schema = new GraphQLSchema({
-    query: RootQuery,
-    mutation: Mutation,
-});
+        res.json(user);
+    } catch (error) {
+        res.status(500).json({ error: 'Something went wrong.' });
+    }
+})
 
-// 5. Cấu hình GraphQL endpoint
-app.use('/graphql', graphqlHTTP({
-    schema,
-}));
+//Update thong tin user
+app.put('/update-user/:id' , async (req, res) => {
+    const { id } = req.params;
+    const { name, age } = req.body;
+    try {
+        const updateUser = await prisma.user.update({
+            data: {
+                name,
+                age,
+            },
+            where: {id},
+        })
 
-// 6. Khởi động máy chủ
+        res.json(updateUser);
+    } catch (error) {
+        res.status(500).json({ error: 'Something went wrong.' });
+    }
+})
+
+//Xoa 1 user
+app.delete('/delete-user/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const deletedUser = await prisma.user.delete({
+            where: {id},
+        })
+
+        res.json(deletedUser);
+    } catch (error) {
+        
+    }
+})
+
 app.listen(3000, () => {
-    console.log('Server is running on http://localhost:3000/graphql');
+    console.log(`Server is running on http://localhost:3000`);
 });
